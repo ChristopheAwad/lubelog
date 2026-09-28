@@ -1124,6 +1124,7 @@ namespace CarCareTracker.Controllers
                             {
                                 existingRecord.Id = default;
                                 existingRecord.RequisitionHistory = new List<SupplyUsageHistory>();
+                                existingRecord.ReminderRecordIds = new List<int>();
                                 existingRecord.VehicleId = vehicleId;
                                 result = _serviceRecordDataAccess.SaveServiceRecordToVehicle(existingRecord);
                             }
@@ -1140,6 +1141,7 @@ namespace CarCareTracker.Controllers
                             {
                                 existingRecord.Id = default;
                                 existingRecord.RequisitionHistory = new List<SupplyUsageHistory>();
+                                existingRecord.ReminderRecordIds = new List<int>();
                                 existingRecord.VehicleId = vehicleId;
                                 result = _collisionRecordDataAccess.SaveCollisionRecordToVehicle(existingRecord);
                             }
@@ -1156,6 +1158,7 @@ namespace CarCareTracker.Controllers
                             {
                                 existingRecord.Id = default;
                                 existingRecord.RequisitionHistory = new List<SupplyUsageHistory>();
+                                existingRecord.ReminderRecordIds = new List<int>();
                                 existingRecord.VehicleId = vehicleId;
                                 result = _upgradeRecordDataAccess.SaveUpgradeRecordToVehicle(existingRecord);
                             }
@@ -1187,6 +1190,7 @@ namespace CarCareTracker.Controllers
                             foreach (int vehicleId in vehicleIds)
                             {
                                 existingRecord.Id = default;
+                                existingRecord.ReminderRecordIds = new List<int>();
                                 existingRecord.VehicleId = vehicleId;
                                 result = _taxRecordDataAccess.SaveTaxRecordToVehicle(existingRecord);
                             }

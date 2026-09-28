@@ -75,7 +75,7 @@ namespace CarCareTracker.Controllers
                 linkedTaxReminderIds = storedTaxReminderIds.Union(newlySelectedTaxIds).Distinct().ToList();
                 if (existingTaxRecord is not null && existingTaxRecord.Id != default)
                 {
-                    CorrectLinkedReminders(linkedTaxReminderIds, existingTaxRecord.Date, 0, newTaxDate, 0);
+                    CorrectLinkedReminders(storedTaxReminderIds, existingTaxRecord.Date, 0, newTaxDate, 0);
                 }
             }
             var convertedTaxRecord = taxRecord.ToTaxRecord();

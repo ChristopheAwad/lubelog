@@ -72,7 +72,7 @@ namespace CarCareTracker.Controllers
                 linkedCollisionReminderIds = storedCollisionReminderIds.Union(newlySelectedCollisionIds).Distinct().ToList();
                 if (existingCollisionRecord is not null && existingCollisionRecord.Id != default)
                 {
-                    CorrectLinkedReminders(linkedCollisionReminderIds, existingCollisionRecord.Date, existingCollisionRecord.Mileage, newCollisionDate, collisionRecord.Mileage);
+                    CorrectLinkedReminders(storedCollisionReminderIds, existingCollisionRecord.Date, existingCollisionRecord.Mileage, newCollisionDate, collisionRecord.Mileage);
                 }
             }
             var convertedRecord = collisionRecord.ToCollisionRecord();

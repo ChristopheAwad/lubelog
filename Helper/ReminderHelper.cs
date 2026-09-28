@@ -101,6 +101,10 @@ namespace CarCareTracker.Helper
         public ReminderRecord GetRolledBackRecurringReminderRecord(ReminderRecord existingReminder)
         {
             //Undo a single push-forward (used when the linked service/repair record is deleted).
+            //Note: unlike correction above, rollback applies to fixed-interval reminders too,
+            //since creation pushes them forward by one interval. Month rollback via
+            //AddMonths(-n) is not an exact inverse across month-length boundaries (e.g. Jan 31),
+            //which is acceptable for the single-link case.
             if (existingReminder.Metric == ReminderMetric.Both || existingReminder.Metric == ReminderMetric.Date)
             {
                 if (existingReminder.ReminderMonthInterval != ReminderMonthInterval.Other)

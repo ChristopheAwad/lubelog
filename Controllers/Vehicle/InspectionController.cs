@@ -212,7 +212,7 @@ namespace CarCareTracker.Controllers
                 linkedInspectionReminderIds = storedInspectionReminderIds.Union(newlySelectedInspectionIds).Distinct().ToList();
                 if (existingInspectionRecord is not null && existingInspectionRecord.Id != default)
                 {
-                    CorrectLinkedReminders(linkedInspectionReminderIds, existingInspectionRecord.Date, existingInspectionRecord.Mileage, newInspectionDate, inspectionRecord.Mileage);
+                    CorrectLinkedReminders(storedInspectionReminderIds, existingInspectionRecord.Date, existingInspectionRecord.Mileage, newInspectionDate, inspectionRecord.Mileage);
                 }
             }
             var convertedRecord = inspectionRecord.ToInspectionRecord();

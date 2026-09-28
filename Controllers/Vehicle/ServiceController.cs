@@ -75,7 +75,7 @@ namespace CarCareTracker.Controllers
                 linkedReminderIds = storedReminderIds.Union(newlySelectedIds).Distinct().ToList();
                 if (existingServiceRecord is not null && existingServiceRecord.Id != default)
                 {
-                    CorrectLinkedReminders(linkedReminderIds, existingServiceRecord.Date, existingServiceRecord.Mileage, newServiceDate, serviceRecord.Mileage);
+                    CorrectLinkedReminders(storedReminderIds, existingServiceRecord.Date, existingServiceRecord.Mileage, newServiceDate, serviceRecord.Mileage);
                 }
             }
             var convertedRecord = serviceRecord.ToServiceRecord();

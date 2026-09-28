@@ -72,7 +72,7 @@ namespace CarCareTracker.Controllers
                 linkedUpgradeReminderIds = storedUpgradeReminderIds.Union(newlySelectedUpgradeIds).Distinct().ToList();
                 if (existingUpgradeRecord is not null && existingUpgradeRecord.Id != default)
                 {
-                    CorrectLinkedReminders(linkedUpgradeReminderIds, existingUpgradeRecord.Date, existingUpgradeRecord.Mileage, newUpgradeDate, upgradeRecord.Mileage);
+                    CorrectLinkedReminders(storedUpgradeReminderIds, existingUpgradeRecord.Date, existingUpgradeRecord.Mileage, newUpgradeDate, upgradeRecord.Mileage);
                 }
             }
             var convertedRecord = upgradeRecord.ToUpgradeRecord();
