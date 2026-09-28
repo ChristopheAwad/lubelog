@@ -877,24 +877,30 @@ namespace CarCareTracker.Controllers
                     case ImportMode.ServiceRecord:
                         {
                             var existingRecord = _serviceRecordDataAccess.GetServiceRecordById(recordId);
+                            var oldMileage = existingRecord.Mileage;
                             existingRecord.Mileage += int.Parse(vehicleData.OdometerDifference);
                             existingRecord.Mileage = decimal.ToInt32(existingRecord.Mileage * decimal.Parse(vehicleData.OdometerMultiplier, NumberStyles.Any));
+                            CorrectLinkedReminders(existingRecord.ReminderRecordIds ?? new List<int>(), existingRecord.Date, oldMileage, existingRecord.Date, existingRecord.Mileage);
                             result = _serviceRecordDataAccess.SaveServiceRecordToVehicle(existingRecord);
                         }
                         break;
                     case ImportMode.RepairRecord:
                         {
                             var existingRecord = _collisionRecordDataAccess.GetCollisionRecordById(recordId);
+                            var oldMileage = existingRecord.Mileage;
                             existingRecord.Mileage += int.Parse(vehicleData.OdometerDifference);
                             existingRecord.Mileage = decimal.ToInt32(existingRecord.Mileage * decimal.Parse(vehicleData.OdometerMultiplier, NumberStyles.Any));
+                            CorrectLinkedReminders(existingRecord.ReminderRecordIds ?? new List<int>(), existingRecord.Date, oldMileage, existingRecord.Date, existingRecord.Mileage);
                             result = _collisionRecordDataAccess.SaveCollisionRecordToVehicle(existingRecord);
                         }
                         break;
                     case ImportMode.UpgradeRecord:
                         {
                             var existingRecord = _upgradeRecordDataAccess.GetUpgradeRecordById(recordId);
+                            var oldMileage = existingRecord.Mileage;
                             existingRecord.Mileage += int.Parse(vehicleData.OdometerDifference);
                             existingRecord.Mileage = decimal.ToInt32(existingRecord.Mileage * decimal.Parse(vehicleData.OdometerMultiplier, NumberStyles.Any));
+                            CorrectLinkedReminders(existingRecord.ReminderRecordIds ?? new List<int>(), existingRecord.Date, oldMileage, existingRecord.Date, existingRecord.Mileage);
                             result = _upgradeRecordDataAccess.SaveUpgradeRecordToVehicle(existingRecord);
                         }
                         break;
@@ -940,6 +946,7 @@ namespace CarCareTracker.Controllers
                             }
                             existingRecord.Id = default;
                             existingRecord.RequisitionHistory = new List<SupplyUsageHistory>();
+                            existingRecord.ReminderRecordIds = new List<int>();
                             result = _serviceRecordDataAccess.SaveServiceRecordToVehicle(existingRecord);
                         }
                         break;
@@ -953,6 +960,7 @@ namespace CarCareTracker.Controllers
                             }
                             existingRecord.Id = default;
                             existingRecord.RequisitionHistory = new List<SupplyUsageHistory>();
+                            existingRecord.ReminderRecordIds = new List<int>();
                             result = _collisionRecordDataAccess.SaveCollisionRecordToVehicle(existingRecord);
                         }
                         break;
@@ -966,6 +974,7 @@ namespace CarCareTracker.Controllers
                             }
                             existingRecord.Id = default;
                             existingRecord.RequisitionHistory = new List<SupplyUsageHistory>();
+                            existingRecord.ReminderRecordIds = new List<int>();
                             result = _upgradeRecordDataAccess.SaveUpgradeRecordToVehicle(existingRecord);
                         }
                         break;
@@ -990,6 +999,7 @@ namespace CarCareTracker.Controllers
                                 return Json(OperationResponse.Failed("Access Denied"));
                             }
                             existingRecord.Id = default;
+                            existingRecord.ReminderRecordIds = new List<int>();
                             result = _taxRecordDataAccess.SaveTaxRecordToVehicle(existingRecord);
                         }
                         break;

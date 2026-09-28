@@ -115,6 +115,7 @@ namespace CarCareTracker.Controllers
             var result = _inspectionRecordDataAccess.DeleteInspectionRecordById(existingRecord.Id);
             if (result)
             {
+                RollbackLinkedReminders(existingRecord.ReminderRecordIds ?? new List<int>());
                 _eventLogic.PublishEvent(GetUserID(), WebHookPayload.FromInspectionRecord(existingRecord, "inspectionrecord.delete", User.Identity?.Name ?? string.Empty));
             }
             return OperationResponse.Conditional(result, string.Empty, StaticHelper.GenericErrorMessage);
@@ -184,19 +185,42 @@ namespace CarCareTracker.Controllers
             }
             //move files from temp.
             inspectionRecord.Files = inspectionRecord.Files.Select(x => { return new UploadedFiles { Name = x.Name, Location = _fileHelper.MoveFileFromTemp(x.Location, "documents/") }; }).ToList();
-            //push back any reminders
-            if (inspectionRecord.ReminderRecordId.Any())
+            var newInspectionDate = DateTime.Parse(inspectionRecord.Date);
+            bool isNewInspectionRecord = inspectionRecord.Id == default;
+            List<int> linkedInspectionReminderIds;
+            if (isNewInspectionRecord)
             {
-                foreach (int reminderRecordId in inspectionRecord.ReminderRecordId)
+                linkedInspectionReminderIds = inspectionRecord.ReminderRecordId?.Distinct().ToList() ?? new List<int>();
+                if (linkedInspectionReminderIds.Any())
                 {
-                    PushbackRecurringReminderRecordWithChecks(reminderRecordId, DateTime.Parse(inspectionRecord.Date), inspectionRecord.Mileage);
+                    foreach (int reminderRecordId in linkedInspectionReminderIds)
+                    {
+                        PushbackRecurringReminderRecordWithChecks(reminderRecordId, newInspectionDate, inspectionRecord.Mileage);
+                    }
+                }
+            }
+            else
+            {
+                var existingInspectionRecord = _inspectionRecordDataAccess.GetInspectionRecordById(inspectionRecord.Id);
+                var storedInspectionReminderIds = existingInspectionRecord?.ReminderRecordIds ?? new List<int>();
+                var newlySelectedInspectionIds = inspectionRecord.ReminderRecordId ?? new List<int>();
+                var newInspectionLinks = newlySelectedInspectionIds.Except(storedInspectionReminderIds).Distinct().ToList();
+                foreach (int reminderRecordId in newInspectionLinks)
+                {
+                    PushbackRecurringReminderRecordWithChecks(reminderRecordId, newInspectionDate, inspectionRecord.Mileage);
+                }
+                linkedInspectionReminderIds = storedInspectionReminderIds.Union(newlySelectedInspectionIds).Distinct().ToList();
+                if (existingInspectionRecord is not null && existingInspectionRecord.Id != default)
+                {
+                    CorrectLinkedReminders(linkedInspectionReminderIds, existingInspectionRecord.Date, existingInspectionRecord.Mileage, newInspectionDate, inspectionRecord.Mileage);
                 }
             }
             var convertedRecord = inspectionRecord.ToInspectionRecord();
+            convertedRecord.ReminderRecordIds = linkedInspectionReminderIds;
             var result = _inspectionRecordDataAccess.SaveInspectionRecordToVehicle(convertedRecord);
             if (result)
             {
-                _eventLogic.PublishEvent(GetUserID(), WebHookPayload.FromInspectionRecord(convertedRecord, "inspectionrecord.add", User.Identity?.Name ?? string.Empty));
+                _eventLogic.PublishEvent(GetUserID(), WebHookPayload.FromInspectionRecord(convertedRecord, isNewInspectionRecord ? "inspectionrecord.add" : "inspectionrecord.update", User.Identity?.Name ?? string.Empty));
             }
             if (convertedRecord.Id != 0)
             {

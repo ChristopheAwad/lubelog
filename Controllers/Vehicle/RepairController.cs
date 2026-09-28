@@ -45,15 +45,38 @@ namespace CarCareTracker.Controllers
             {
                 _vehicleLogic.RestoreSupplyRecordsByUsage(collisionRecord.DeletedRequisitionHistory, collisionRecord.Description);
             }
-            //push back any reminders
-            if (collisionRecord.ReminderRecordId.Any())
+            var newCollisionDate = DateTime.Parse(collisionRecord.Date);
+            bool isNewCollisionRecord = collisionRecord.Id == default;
+            List<int> linkedCollisionReminderIds;
+            if (isNewCollisionRecord)
             {
-                foreach (int reminderRecordId in collisionRecord.ReminderRecordId)
+                linkedCollisionReminderIds = collisionRecord.ReminderRecordId?.Distinct().ToList() ?? new List<int>();
+                if (linkedCollisionReminderIds.Any())
                 {
-                    PushbackRecurringReminderRecordWithChecks(reminderRecordId, DateTime.Parse(collisionRecord.Date), collisionRecord.Mileage);
+                    foreach (int reminderRecordId in linkedCollisionReminderIds)
+                    {
+                        PushbackRecurringReminderRecordWithChecks(reminderRecordId, newCollisionDate, collisionRecord.Mileage);
+                    }
+                }
+            }
+            else
+            {
+                var existingCollisionRecord = _collisionRecordDataAccess.GetCollisionRecordById(collisionRecord.Id);
+                var storedCollisionReminderIds = existingCollisionRecord?.ReminderRecordIds ?? new List<int>();
+                var newlySelectedCollisionIds = collisionRecord.ReminderRecordId ?? new List<int>();
+                var newCollisionLinks = newlySelectedCollisionIds.Except(storedCollisionReminderIds).Distinct().ToList();
+                foreach (int reminderRecordId in newCollisionLinks)
+                {
+                    PushbackRecurringReminderRecordWithChecks(reminderRecordId, newCollisionDate, collisionRecord.Mileage);
+                }
+                linkedCollisionReminderIds = storedCollisionReminderIds.Union(newlySelectedCollisionIds).Distinct().ToList();
+                if (existingCollisionRecord is not null && existingCollisionRecord.Id != default)
+                {
+                    CorrectLinkedReminders(linkedCollisionReminderIds, existingCollisionRecord.Date, existingCollisionRecord.Mileage, newCollisionDate, collisionRecord.Mileage);
                 }
             }
             var convertedRecord = collisionRecord.ToCollisionRecord();
+            convertedRecord.ReminderRecordIds = linkedCollisionReminderIds;
             var result = _collisionRecordDataAccess.SaveCollisionRecordToVehicle(convertedRecord);
             if (result)
             {
@@ -119,6 +142,7 @@ namespace CarCareTracker.Controllers
             var result = _collisionRecordDataAccess.DeleteCollisionRecordById(existingRecord.Id);
             if (result)
             {
+                RollbackLinkedReminders(existingRecord.ReminderRecordIds ?? new List<int>());
                 _eventLogic.PublishEvent(GetUserID(), WebHookPayload.FromGenericRecord(existingRecord, "repairrecord.delete", User.Identity?.Name ?? string.Empty));
             }
             return OperationResponse.Conditional(result, string.Empty, StaticHelper.GenericErrorMessage);

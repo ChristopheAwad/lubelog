@@ -202,6 +202,7 @@ namespace CarCareTracker.Controllers
             var result = _taxRecordDataAccess.DeleteTaxRecordById(existingRecord.Id);
             if (result)
             {
+                RollbackLinkedRemindersApi(existingRecord.ReminderRecordIds ?? new List<int>());
                 _eventLogic.PublishEvent(GetUserID(), WebHookPayload.FromTaxRecord(existingRecord, "taxrecord.delete.api", User.Identity?.Name ?? string.Empty));
             }
             return Json(OperationResponse.Conditional(result, "Tax Record Deleted"));
@@ -244,13 +245,16 @@ namespace CarCareTracker.Controllers
                         Response.StatusCode = 403;
                         return Json(OperationResponse.Failed("Access Denied, you don't have access to this vehicle."));
                     }
-                    existingRecord.Date = DateTime.Parse(input.Date);
+                    var oldTaxDate = existingRecord.Date;
+                    var newTaxDate = DateTime.Parse(input.Date);
+                    existingRecord.Date = newTaxDate;
                     existingRecord.Description = input.Description;
                     existingRecord.Notes = string.IsNullOrWhiteSpace(input.Notes) ? "" : input.Notes;
                     existingRecord.Cost = decimal.Parse(input.Cost);
                     existingRecord.ExtraFields = input.ExtraFields;
                     existingRecord.Files = input.Files;
                     existingRecord.Tags = string.IsNullOrWhiteSpace(input.Tags) ? new List<string>() : input.Tags.Split(' ').Distinct().ToList();
+                    CorrectLinkedRemindersApi(existingRecord.ReminderRecordIds ?? new List<int>(), oldTaxDate, 0, newTaxDate, 0);
                     _taxRecordDataAccess.SaveTaxRecordToVehicle(existingRecord);
                     _eventLogic.PublishEvent(GetUserID(), WebHookPayload.FromTaxRecord(existingRecord, "taxrecord.update.api", User.Identity?.Name ?? string.Empty));
                 }

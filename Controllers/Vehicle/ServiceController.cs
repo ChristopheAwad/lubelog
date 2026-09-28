@@ -45,15 +45,41 @@ namespace CarCareTracker.Controllers
             {
                 _vehicleLogic.RestoreSupplyRecordsByUsage(serviceRecord.DeletedRequisitionHistory, serviceRecord.Description);
             }
-            //push back any reminders
-            if (serviceRecord.ReminderRecordId.Any())
+            var newServiceDate = DateTime.Parse(serviceRecord.Date);
+            bool isNewRecord = serviceRecord.Id == default;
+            List<int> linkedReminderIds;
+            if (isNewRecord)
             {
-                foreach (int reminderRecordId in serviceRecord.ReminderRecordId)
+                //push back any reminders
+                linkedReminderIds = serviceRecord.ReminderRecordId?.Distinct().ToList() ?? new List<int>();
+                if (linkedReminderIds.Any())
                 {
-                    PushbackRecurringReminderRecordWithChecks(reminderRecordId, DateTime.Parse(serviceRecord.Date), serviceRecord.Mileage);
+                    foreach (int reminderRecordId in linkedReminderIds)
+                    {
+                        PushbackRecurringReminderRecordWithChecks(reminderRecordId, newServiceDate, serviceRecord.Mileage);
+                    }
+                }
+            }
+            else
+            {
+                //edit: correct previously linked reminders by date/mileage delta.
+                //New links (if any) are pushed forward, existing links are corrected.
+                var existingServiceRecord = _serviceRecordDataAccess.GetServiceRecordById(serviceRecord.Id);
+                var storedReminderIds = existingServiceRecord?.ReminderRecordIds ?? new List<int>();
+                var newlySelectedIds = serviceRecord.ReminderRecordId ?? new List<int>();
+                var newLinks = newlySelectedIds.Except(storedReminderIds).Distinct().ToList();
+                foreach (int reminderRecordId in newLinks)
+                {
+                    PushbackRecurringReminderRecordWithChecks(reminderRecordId, newServiceDate, serviceRecord.Mileage);
+                }
+                linkedReminderIds = storedReminderIds.Union(newlySelectedIds).Distinct().ToList();
+                if (existingServiceRecord is not null && existingServiceRecord.Id != default)
+                {
+                    CorrectLinkedReminders(linkedReminderIds, existingServiceRecord.Date, existingServiceRecord.Mileage, newServiceDate, serviceRecord.Mileage);
                 }
             }
             var convertedRecord = serviceRecord.ToServiceRecord();
+            convertedRecord.ReminderRecordIds = linkedReminderIds;
             var result = _serviceRecordDataAccess.SaveServiceRecordToVehicle(convertedRecord);
             if (result)
             {
@@ -119,6 +145,7 @@ namespace CarCareTracker.Controllers
             var result = _serviceRecordDataAccess.DeleteServiceRecordById(existingRecord.Id);
             if (result)
             {
+                RollbackLinkedReminders(existingRecord.ReminderRecordIds ?? new List<int>());
                 _eventLogic.PublishEvent(GetUserID(), WebHookPayload.FromGenericRecord(existingRecord, "servicerecord.delete", User.Identity?.Name ?? string.Empty));
             }
             return OperationResponse.Conditional(result, string.Empty, StaticHelper.GenericErrorMessage);

@@ -29,7 +29,8 @@
             CustomMonthIntervalUnit = CustomMonthIntervalUnit,
             Files = Files,
             Tags = Tags,
-            ExtraFields = ExtraFields
+            ExtraFields = ExtraFields,
+            ReminderRecordIds = ReminderRecordId ?? new List<int>()
         }; }
     }
 }

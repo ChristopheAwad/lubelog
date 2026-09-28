@@ -28,7 +28,8 @@
             Files = Files, 
             Tags = Tags, 
             ExtraFields = ExtraFields,
-            RequisitionHistory = RequisitionHistory
+            RequisitionHistory = RequisitionHistory,
+            ReminderRecordIds = ReminderRecordId ?? new List<int>()
         }; 
         }
     }

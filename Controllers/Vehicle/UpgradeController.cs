@@ -45,15 +45,38 @@ namespace CarCareTracker.Controllers
             {
                 _vehicleLogic.RestoreSupplyRecordsByUsage(upgradeRecord.DeletedRequisitionHistory, upgradeRecord.Description);
             }
-            //push back any reminders
-            if (upgradeRecord.ReminderRecordId.Any())
+            var newUpgradeDate = DateTime.Parse(upgradeRecord.Date);
+            bool isNewUpgradeRecord = upgradeRecord.Id == default;
+            List<int> linkedUpgradeReminderIds;
+            if (isNewUpgradeRecord)
             {
-                foreach (int reminderRecordId in upgradeRecord.ReminderRecordId)
+                linkedUpgradeReminderIds = upgradeRecord.ReminderRecordId?.Distinct().ToList() ?? new List<int>();
+                if (linkedUpgradeReminderIds.Any())
                 {
-                    PushbackRecurringReminderRecordWithChecks(reminderRecordId, DateTime.Parse(upgradeRecord.Date), upgradeRecord.Mileage);
+                    foreach (int reminderRecordId in linkedUpgradeReminderIds)
+                    {
+                        PushbackRecurringReminderRecordWithChecks(reminderRecordId, newUpgradeDate, upgradeRecord.Mileage);
+                    }
+                }
+            }
+            else
+            {
+                var existingUpgradeRecord = _upgradeRecordDataAccess.GetUpgradeRecordById(upgradeRecord.Id);
+                var storedUpgradeReminderIds = existingUpgradeRecord?.ReminderRecordIds ?? new List<int>();
+                var newlySelectedUpgradeIds = upgradeRecord.ReminderRecordId ?? new List<int>();
+                var newUpgradeLinks = newlySelectedUpgradeIds.Except(storedUpgradeReminderIds).Distinct().ToList();
+                foreach (int reminderRecordId in newUpgradeLinks)
+                {
+                    PushbackRecurringReminderRecordWithChecks(reminderRecordId, newUpgradeDate, upgradeRecord.Mileage);
+                }
+                linkedUpgradeReminderIds = storedUpgradeReminderIds.Union(newlySelectedUpgradeIds).Distinct().ToList();
+                if (existingUpgradeRecord is not null && existingUpgradeRecord.Id != default)
+                {
+                    CorrectLinkedReminders(linkedUpgradeReminderIds, existingUpgradeRecord.Date, existingUpgradeRecord.Mileage, newUpgradeDate, upgradeRecord.Mileage);
                 }
             }
             var convertedRecord = upgradeRecord.ToUpgradeRecord();
+            convertedRecord.ReminderRecordIds = linkedUpgradeReminderIds;
             var result = _upgradeRecordDataAccess.SaveUpgradeRecordToVehicle(convertedRecord);
             if (result)
             {
@@ -119,6 +142,7 @@ namespace CarCareTracker.Controllers
             var result = _upgradeRecordDataAccess.DeleteUpgradeRecordById(existingRecord.Id);
             if (result)
             {
+                RollbackLinkedReminders(existingRecord.ReminderRecordIds ?? new List<int>());
                 _eventLogic.PublishEvent(GetUserID(), WebHookPayload.FromGenericRecord(existingRecord, "upgraderecord.delete", User.Identity?.Name ?? string.Empty));
             }
             return OperationResponse.Conditional(result, string.Empty, StaticHelper.GenericErrorMessage);

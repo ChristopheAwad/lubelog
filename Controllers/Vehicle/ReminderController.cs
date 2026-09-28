@@ -109,6 +109,66 @@ namespace CarCareTracker.Controllers
                 return OperationResponse.Failed(StaticHelper.GenericErrorMessage);
             }
         }
+        private void CorrectLinkedReminders(List<int> reminderRecordIds, DateTime oldDate, int oldMileage, DateTime newDate, int newMileage)
+        {
+            if (reminderRecordIds is null || !reminderRecordIds.Any())
+            {
+                return;
+            }
+            if (oldDate.Date == newDate.Date && oldMileage == newMileage)
+            {
+                return;
+            }
+            foreach (int reminderRecordId in reminderRecordIds.Distinct())
+            {
+                try
+                {
+                    var existingReminder = _reminderRecordDataAccess.GetReminderRecordById(reminderRecordId);
+                    if (existingReminder is null || existingReminder.Id == default || !existingReminder.IsRecurring)
+                    {
+                        continue;
+                    }
+                    if (!_userLogic.UserCanEditVehicle(GetUserID(), existingReminder.VehicleId, HouseholdPermission.Edit))
+                    {
+                        continue;
+                    }
+                    existingReminder = _reminderHelper.GetCorrectedRecurringReminderRecord(existingReminder, oldDate, oldMileage, newDate, newMileage);
+                    _reminderRecordDataAccess.SaveReminderRecordToVehicle(existingReminder);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex.Message);
+                }
+            }
+        }
+        private void RollbackLinkedReminders(List<int> reminderRecordIds)
+        {
+            if (reminderRecordIds is null || !reminderRecordIds.Any())
+            {
+                return;
+            }
+            foreach (int reminderRecordId in reminderRecordIds.Distinct())
+            {
+                try
+                {
+                    var existingReminder = _reminderRecordDataAccess.GetReminderRecordById(reminderRecordId);
+                    if (existingReminder is null || existingReminder.Id == default || !existingReminder.IsRecurring)
+                    {
+                        continue;
+                    }
+                    if (!_userLogic.UserCanEditVehicle(GetUserID(), existingReminder.VehicleId, HouseholdPermission.Edit))
+                    {
+                        continue;
+                    }
+                    existingReminder = _reminderHelper.GetRolledBackRecurringReminderRecord(existingReminder);
+                    _reminderRecordDataAccess.SaveReminderRecordToVehicle(existingReminder);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex.Message);
+                }
+            }
+        }
         [HttpPost]
         public IActionResult SaveReminderRecordToVehicleId(ReminderRecordInput reminderRecord)
         {

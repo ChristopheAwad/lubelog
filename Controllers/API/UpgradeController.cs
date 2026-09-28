@@ -184,6 +184,7 @@ namespace CarCareTracker.Controllers
             var result = _upgradeRecordDataAccess.DeleteUpgradeRecordById(existingRecord.Id);
             if (result)
             {
+                RollbackLinkedRemindersApi(existingRecord.ReminderRecordIds ?? new List<int>());
                 _eventLogic.PublishEvent(GetUserID(), WebHookPayload.FromGenericRecord(existingRecord, "upgraderecord.delete.api", User.Identity?.Name ?? string.Empty));
             }
             return Json(OperationResponse.Conditional(result, "Upgrade Record Deleted"));
@@ -227,14 +228,19 @@ namespace CarCareTracker.Controllers
                         Response.StatusCode = 403;
                         return Json(OperationResponse.Failed("Access Denied, you don't have access to this vehicle."));
                     }
-                    existingRecord.Date = DateTime.Parse(input.Date);
-                    existingRecord.Mileage = int.Parse(input.Odometer);
+                    var oldUpgradeDate = existingRecord.Date;
+                    var oldUpgradeMileage = existingRecord.Mileage;
+                    var newUpgradeDate = DateTime.Parse(input.Date);
+                    var newUpgradeMileage = int.Parse(input.Odometer);
+                    existingRecord.Date = newUpgradeDate;
+                    existingRecord.Mileage = newUpgradeMileage;
                     existingRecord.Description = input.Description;
                     existingRecord.Notes = string.IsNullOrWhiteSpace(input.Notes) ? "" : input.Notes;
                     existingRecord.Cost = decimal.Parse(input.Cost);
                     existingRecord.ExtraFields = input.ExtraFields;
                     existingRecord.Files = input.Files;
                     existingRecord.Tags = string.IsNullOrWhiteSpace(input.Tags) ? new List<string>() : input.Tags.Split(' ').Distinct().ToList();
+                    CorrectLinkedRemindersApi(existingRecord.ReminderRecordIds ?? new List<int>(), oldUpgradeDate, oldUpgradeMileage, newUpgradeDate, newUpgradeMileage);
                     _upgradeRecordDataAccess.SaveUpgradeRecordToVehicle(existingRecord);
                     _eventLogic.PublishEvent(GetUserID(), WebHookPayload.FromGenericRecord(existingRecord, "upgraderecord.update.api", User.Identity?.Name ?? string.Empty));
                 }

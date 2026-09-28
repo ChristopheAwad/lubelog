@@ -185,6 +185,7 @@ namespace CarCareTracker.Controllers
             var result = _collisionRecordDataAccess.DeleteCollisionRecordById(existingRecord.Id);
             if (result)
             {
+                RollbackLinkedRemindersApi(existingRecord.ReminderRecordIds ?? new List<int>());
                 _eventLogic.PublishEvent(GetUserID(), WebHookPayload.FromGenericRecord(existingRecord, "repairrecord.delete.api", User.Identity?.Name ?? string.Empty));
             }
             return Json(OperationResponse.Conditional(result, "Repair Record Deleted"));
@@ -228,14 +229,19 @@ namespace CarCareTracker.Controllers
                         Response.StatusCode = 403;
                         return Json(OperationResponse.Failed("Access Denied, you don't have access to this vehicle."));
                     }
-                    existingRecord.Date = DateTime.Parse(input.Date);
-                    existingRecord.Mileage = int.Parse(input.Odometer);
+                    var oldRepairDate = existingRecord.Date;
+                    var oldRepairMileage = existingRecord.Mileage;
+                    var newRepairDate = DateTime.Parse(input.Date);
+                    var newRepairMileage = int.Parse(input.Odometer);
+                    existingRecord.Date = newRepairDate;
+                    existingRecord.Mileage = newRepairMileage;
                     existingRecord.Description = input.Description;
                     existingRecord.Notes = string.IsNullOrWhiteSpace(input.Notes) ? "" : input.Notes;
                     existingRecord.Cost = decimal.Parse(input.Cost);
                     existingRecord.ExtraFields = input.ExtraFields;
                     existingRecord.Files = input.Files;
                     existingRecord.Tags = string.IsNullOrWhiteSpace(input.Tags) ? new List<string>() : input.Tags.Split(' ').Distinct().ToList();
+                    CorrectLinkedRemindersApi(existingRecord.ReminderRecordIds ?? new List<int>(), oldRepairDate, oldRepairMileage, newRepairDate, newRepairMileage);
                     _collisionRecordDataAccess.SaveCollisionRecordToVehicle(existingRecord);
                     _eventLogic.PublishEvent(GetUserID(), WebHookPayload.FromGenericRecord(existingRecord, "repairrecord.update.api", User.Identity?.Name ?? string.Empty));
                 }

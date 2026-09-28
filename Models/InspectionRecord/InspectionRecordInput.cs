@@ -24,7 +24,8 @@
                 Description = Description,
                 Results = Fields.Select(x => x.ToInspectionRecordResult()).ToList(),
                 Files = Files,
-                Tags = Tags
+                Tags = Tags,
+                ReminderRecordIds = ReminderRecordId ?? new List<int>()
             };
         }
     }

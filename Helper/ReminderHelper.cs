@@ -5,6 +5,8 @@ namespace CarCareTracker.Helper
     public interface IReminderHelper
     {
         ReminderRecord GetUpdatedRecurringReminderRecord(ReminderRecord existingReminder, DateTime? currentDate, int? currentMileage);
+        ReminderRecord GetCorrectedRecurringReminderRecord(ReminderRecord existingReminder, DateTime oldDate, int oldMileage, DateTime newDate, int newMileage);
+        ReminderRecord GetRolledBackRecurringReminderRecord(ReminderRecord existingReminder);
         List<ReminderRecordViewModel> GetReminderRecordViewModels(List<ReminderRecord> reminders, int currentMileage, DateTime dateCompare);
     }
     public class ReminderHelper: IReminderHelper
@@ -71,6 +73,58 @@ namespace CarCareTracker.Helper
                         existingReminder.Date = newDate.AddDays(existingReminder.CustomMonthInterval);
                     }
                 }
+            }
+            return existingReminder;
+        }
+        public ReminderRecord GetCorrectedRecurringReminderRecord(ReminderRecord existingReminder, DateTime oldDate, int oldMileage, DateTime newDate, int newMileage)
+        {
+            //Adjust a reminder that was previously pushed forward by a service/repair record
+            //when that record's date/mileage is edited. Uses delta so manual edits made
+            //after the push are preserved. Fixed-interval reminders ignore service values.
+            if (existingReminder.FixedIntervals)
+            {
+                return existingReminder;
+            }
+            bool touchesDate = existingReminder.Metric == ReminderMetric.Date || existingReminder.Metric == ReminderMetric.Both;
+            bool touchesMileage = existingReminder.Metric == ReminderMetric.Odometer || existingReminder.Metric == ReminderMetric.Both;
+            if (touchesDate && oldDate.Date != newDate.Date)
+            {
+                var dateDelta = (newDate.Date - oldDate.Date).Days;
+                existingReminder.Date = existingReminder.Date.AddDays(dateDelta);
+            }
+            if (touchesMileage && oldMileage != newMileage)
+            {
+                existingReminder.Mileage = existingReminder.Mileage + (newMileage - oldMileage);
+            }
+            return existingReminder;
+        }
+        public ReminderRecord GetRolledBackRecurringReminderRecord(ReminderRecord existingReminder)
+        {
+            //Undo a single push-forward (used when the linked service/repair record is deleted).
+            if (existingReminder.Metric == ReminderMetric.Both || existingReminder.Metric == ReminderMetric.Date)
+            {
+                if (existingReminder.ReminderMonthInterval != ReminderMonthInterval.Other)
+                {
+                    existingReminder.Date = existingReminder.Date.AddMonths(-(int)existingReminder.ReminderMonthInterval);
+                }
+                else
+                {
+                    if (existingReminder.CustomMonthIntervalUnit == ReminderIntervalUnit.Months)
+                    {
+                        existingReminder.Date = existingReminder.Date.AddMonths(-existingReminder.CustomMonthInterval);
+                    }
+                    else if (existingReminder.CustomMonthIntervalUnit == ReminderIntervalUnit.Days)
+                    {
+                        existingReminder.Date = existingReminder.Date.AddDays(-existingReminder.CustomMonthInterval);
+                    }
+                }
+            }
+            if (existingReminder.Metric == ReminderMetric.Both || existingReminder.Metric == ReminderMetric.Odometer)
+            {
+                int mileageInterval = existingReminder.ReminderMileageInterval != ReminderMileageInterval.Other
+                    ? (int)existingReminder.ReminderMileageInterval
+                    : existingReminder.CustomMileageInterval;
+                existingReminder.Mileage = existingReminder.Mileage - mileageInterval;
             }
             return existingReminder;
         }

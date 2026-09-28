@@ -184,6 +184,7 @@ namespace CarCareTracker.Controllers
             var result = _serviceRecordDataAccess.DeleteServiceRecordById(existingRecord.Id);
             if (result)
             {
+                RollbackLinkedRemindersApi(existingRecord.ReminderRecordIds ?? new List<int>());
                 _eventLogic.PublishEvent(GetUserID(), WebHookPayload.FromGenericRecord(existingRecord, "servicerecord.delete.api", User.Identity?.Name ?? string.Empty));
             }
             return Json(OperationResponse.Conditional(result, "Service Record Deleted"));
@@ -227,14 +228,19 @@ namespace CarCareTracker.Controllers
                         Response.StatusCode = 403;
                         return Json(OperationResponse.Failed("Access Denied, you don't have access to this vehicle."));
                     }
-                    existingRecord.Date = DateTime.Parse(input.Date);
-                    existingRecord.Mileage = int.Parse(input.Odometer);
+                    var oldServiceDate = existingRecord.Date;
+                    var oldServiceMileage = existingRecord.Mileage;
+                    var newServiceDate = DateTime.Parse(input.Date);
+                    var newServiceMileage = int.Parse(input.Odometer);
+                    existingRecord.Date = newServiceDate;
+                    existingRecord.Mileage = newServiceMileage;
                     existingRecord.Description = input.Description;
                     existingRecord.Notes = string.IsNullOrWhiteSpace(input.Notes) ? "" : input.Notes;
                     existingRecord.Cost = decimal.Parse(input.Cost);
                     existingRecord.Files = input.Files;
                     existingRecord.ExtraFields = input.ExtraFields;
                     existingRecord.Tags = string.IsNullOrWhiteSpace(input.Tags) ? new List<string>() : input.Tags.Split(' ').Distinct().ToList();
+                    CorrectLinkedRemindersApi(existingRecord.ReminderRecordIds ?? new List<int>(), oldServiceDate, oldServiceMileage, newServiceDate, newServiceMileage);
                     _serviceRecordDataAccess.SaveServiceRecordToVehicle(existingRecord);
                     _eventLogic.PublishEvent(GetUserID(), WebHookPayload.FromGenericRecord(existingRecord, "servicerecord.update.api", User.Identity?.Name ?? string.Empty));
                 }

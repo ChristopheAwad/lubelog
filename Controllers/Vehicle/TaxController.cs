@@ -48,19 +48,43 @@ namespace CarCareTracker.Controllers
             }
             //move files from temp.
             taxRecord.Files = taxRecord.Files.Select(x => { return new UploadedFiles { Name = x.Name, Location = _fileHelper.MoveFileFromTemp(x.Location, "documents/") }; }).ToList();
-            //push back any reminders
-            if (taxRecord.ReminderRecordId.Any())
+            var newTaxDate = DateTime.Parse(taxRecord.Date);
+            bool isNewTaxRecord = taxRecord.Id == default;
+            List<int> linkedTaxReminderIds;
+            if (isNewTaxRecord)
             {
-                foreach (int reminderRecordId in taxRecord.ReminderRecordId)
+                linkedTaxReminderIds = taxRecord.ReminderRecordId?.Distinct().ToList() ?? new List<int>();
+                if (linkedTaxReminderIds.Any())
                 {
-                    PushbackRecurringReminderRecordWithChecks(reminderRecordId, DateTime.Parse(taxRecord.Date), null);
+                    foreach (int reminderRecordId in linkedTaxReminderIds)
+                    {
+                        PushbackRecurringReminderRecordWithChecks(reminderRecordId, newTaxDate, null);
+                    }
                 }
             }
-            var result = _taxRecordDataAccess.SaveTaxRecordToVehicle(taxRecord.ToTaxRecord());
+            else
+            {
+                var existingTaxRecord = _taxRecordDataAccess.GetTaxRecordById(taxRecord.Id);
+                var storedTaxReminderIds = existingTaxRecord?.ReminderRecordIds ?? new List<int>();
+                var newlySelectedTaxIds = taxRecord.ReminderRecordId ?? new List<int>();
+                var newTaxLinks = newlySelectedTaxIds.Except(storedTaxReminderIds).Distinct().ToList();
+                foreach (int reminderRecordId in newTaxLinks)
+                {
+                    PushbackRecurringReminderRecordWithChecks(reminderRecordId, newTaxDate, null);
+                }
+                linkedTaxReminderIds = storedTaxReminderIds.Union(newlySelectedTaxIds).Distinct().ToList();
+                if (existingTaxRecord is not null && existingTaxRecord.Id != default)
+                {
+                    CorrectLinkedReminders(linkedTaxReminderIds, existingTaxRecord.Date, 0, newTaxDate, 0);
+                }
+            }
+            var convertedTaxRecord = taxRecord.ToTaxRecord();
+            convertedTaxRecord.ReminderRecordIds = linkedTaxReminderIds;
+            var result = _taxRecordDataAccess.SaveTaxRecordToVehicle(convertedTaxRecord);
             _vehicleLogic.UpdateRecurringTaxes(taxRecord.VehicleId);
             if (result)
             {
-                _eventLogic.PublishEvent(GetUserID(), WebHookPayload.FromTaxRecord(taxRecord.ToTaxRecord(), taxRecord.Id == default ? "taxrecord.add" : "taxrecord.update", User.Identity?.Name ?? string.Empty));
+                _eventLogic.PublishEvent(GetUserID(), WebHookPayload.FromTaxRecord(convertedTaxRecord, isNewTaxRecord ? "taxrecord.add" : "taxrecord.update", User.Identity?.Name ?? string.Empty));
             }
             return Json(OperationResponse.Conditional(result, string.Empty, StaticHelper.GenericErrorMessage));
         }
@@ -108,6 +132,7 @@ namespace CarCareTracker.Controllers
             var result = _taxRecordDataAccess.DeleteTaxRecordById(existingRecord.Id);
             if (result)
             {
+                RollbackLinkedReminders(existingRecord.ReminderRecordIds ?? new List<int>());
                 _eventLogic.PublishEvent(GetUserID(), WebHookPayload.FromTaxRecord(existingRecord, "taxrecord.delete", User.Identity?.Name ?? string.Empty));
             }
             return OperationResponse.Conditional(result, string.Empty, StaticHelper.GenericErrorMessage);
